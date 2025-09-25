@@ -2,29 +2,43 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# Konfigurasi API Key
+# 🔑 Konfigurasi API Key
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
+# Pilih model
 model = genai.GenerativeModel("gemini-1.5-flash")
 
 st.title("🎬 Veo 3 Prompt Generator (Auto + Manual Edit)")
 
+# Upload gambar
 uploaded_file = st.file_uploader("Upload gambar produk (jpg/png)", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
+    # Tampilkan gambar
     image = Image.open(uploaded_file)
     st.image(image, caption="Gambar produk", use_column_width=True)
 
+    # Simpan file jadi bytes + mime type
+    image_bytes = uploaded_file.getvalue()
+    image_part = {
+        "mime_type": uploaded_file.type,  # otomatis: image/jpeg atau image/png
+        "data": image_bytes
+    }
+
+    # Tombol analisis otomatis
     if st.button("🔍 Analisis Otomatis"):
         with st.spinner("Sedang menganalisis gambar..."):
-            auto_prompt = model.generate_content([
-                "Analisis gambar ini. Buat deskripsi singkat untuk isi form video promosi: subjek, aksi, ekspresi, tempat, waktu, kamera, pencahayaan, gaya, suasana, musik, dialog, detail tambahan.",
-                image
-            ]).text
+            response = model.generate_content([
+                "Analisis gambar ini. Buat deskripsi singkat untuk isi form video promosi: "
+                "subjek, aksi, ekspresi, tempat, waktu, kamera, pencahayaan, gaya, suasana, "
+                "musik, dialog, detail tambahan.",
+                image_part
+            ])
+            auto_prompt = response.text
 
         st.session_state["auto_prompt"] = auto_prompt
 
-# Isi form (auto terisi kalau sudah dianalisis)
+# -------- FORM MANUAL (auto terisi kalau sudah dianalisis) --------
 subjek = st.text_input("1. Subjek", st.session_state.get("auto_prompt", "Seorang model memegang produk"))
 aksi = st.text_input("2. Aksi", "Menunjukkan produk ke kamera")
 ekspresi = st.text_input("3. Ekspresi", "Tersenyum ramah")
@@ -40,6 +54,7 @@ dialog = st.text_area("12. Kalimat yang Diucapkan", "Segera dapatkan produk terb
 bahasa = st.selectbox("13. Bahasa Percakapan", ["Indonesia", "English"])
 detail = st.text_area("14. Detail Tambahan", "Tambahkan animasi teks promosi di layar")
 
+# -------- OUTPUT PROMPT --------
 if st.button("✨ Buat Prompt Final"):
     hasil = f"""
 Subjek: {subjek}
