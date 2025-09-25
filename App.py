@@ -1,40 +1,38 @@
 import streamlit as st
-from google.cloud import aiplatform
 
-# Inisialisasi Vertex AI
-aiplatform.init(project="YOUR_PROJECT_ID", location="us-central1")
+st.title("🎬 Veo 3 Prompt Generator")
 
-# Nama model Gemini yang valid
-MODEL_ID = "gemini-1.5-flash"
+subjek = st.text_input("1. Subjek", "Seorang kakek Indonesia berambut putih")
+aksi = st.text_input("2. Aksi", "Sedang memegang sepatu promosi")
+ekspresi = st.text_input("3. Ekspresi", "Wajahnya tersenyum ramah")
+tempat = st.text_input("4. Tempat", "Di pasar tradisional")
+waktu = st.selectbox("5. Waktu", ["Pagi", "Siang", "Sore", "Malam"])
+kamera = st.text_input("6. Gerakan Kamera", "Close-up lalu zoom out")
+pencahayaan = st.text_input("7. Pencahayaan", "Natural cinematic")
+gaya = st.text_input("8. Gaya Video", "Realistis modern")
+suasana = st.text_input("9. Suasana Video", "Hidup dan ceria")
+rasio = st.selectbox("10. Aspek Rasio", ["9:16 (Vertikal)", "16:9 (Lanskap)"])
+musik = st.text_input("11. Suara/Musik", "Musik energik modern")
+dialog = st.text_area("12. Kalimat yang Diucapkan", "Ayo buruan, sepatu terbaru ini bikin langkahmu percaya diri!")
+bahasa = st.selectbox("13. Bahasa Percakapan", ["Indonesia", "English"])
+detail = st.text_area("14. Detail Tambahan", "Tambahkan animasi teks promosi di bagian bawah layar")
 
-st.set_page_config(page_title="Analisis Gambar Produk", layout="centered")
-
-st.title("🛍️ Analisis Gambar Produk (Gemini)")
-
-uploaded_file = st.file_uploader("Upload gambar produk (jpg/png)", type=["jpg", "jpeg", "png"])
-
-if uploaded_file:
-    st.image(uploaded_file, caption="Gambar produk", use_container_width=True)
-
-    if st.button("🔍 Analisis Otomatis"):
-        # Load model
-        model = aiplatform.Model(model_name=f"publishers/google/models/{MODEL_ID}")
-
-        # Buat prompt
-        prompt = "Deskripsikan gambar produk ini secara singkat dalam bahasa Indonesia."
-
-        try:
-            response = model.predict(
-                instances=[{
-                    "content": {
-                        "parts": [
-                            {"mimeType": uploaded_file.type, "data": uploaded_file.getvalue()},
-                            {"text": prompt}
-                        ]
-                    }
-                }]
-            )
-            st.success("✅ Analisis selesai")
-            st.write(response)
-        except Exception as e:
-            st.error(f"Gagal analisis gambar: {str(e)}")
+if st.button("✨ Buat Prompt"):
+    hasil = f"""
+Subjek: {subjek}
+Aksi: {aksi}
+Ekspresi: {ekspresi}
+Tempat: {tempat}
+Waktu: {waktu}
+Gerakan Kamera: {kamera}
+Pencahayaan: {pencahayaan}
+Gaya Video: {gaya}
+Suasana Video: {suasana}
+Aspek Rasio: {rasio}
+Suara/Musik: {musik}
+Kalimat yang Diucapkan: {dialog}
+Bahasa Percakapan: {bahasa}
+Detail Tambahan: {detail}
+    """
+    st.subheader("📋 Prompt Siap Pakai")
+    st.code(hasil, language="markdown")
