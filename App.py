@@ -1,8 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
 
-st.write("DEBUG secrets:", st.secrets)
-st.write("Ada key?", "GEMINI_API_KEY" in st.secrets)
 # Konfigurasi API Gemini dari Streamlit Secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
@@ -28,10 +26,19 @@ def analyze_image(file):
       "story": "narasi singkat promosi sesuai gambar"
     }
     """
-    result = model.generate_content([prompt, file])
+
+    # Simpan file sementara di lokal
+    with open(file.name, "wb") as f:
+        f.write(file.getbuffer())
+
+    # Upload ke Gemini
+    uploaded = genai.upload_file(file.name)
+
+    # Kirim prompt + file
+    result = model.generate_content([prompt, uploaded])
     return result.text
 
-# Jika ada gambar diupload → analisis
+# ---- Jika ada gambar diupload → analisis ----
 data = {"subject": "", "action": "", "expression": "", "location": "", "story": ""}
 if uploaded_file:
     with st.spinner("⏳ Menganalisis gambar dengan Gemini..."):
@@ -67,4 +74,4 @@ Narasi promosi (bahasa Indonesia atau Inggris sesuai natural):
 {story}
 """
     st.success("✅ Prompt berhasil dibuat!")
-    st.text_area("Prompt Final", prompt_final_id, height=300)             
+    st.text_area("Prompt Final", prompt_final_id, height=300)
