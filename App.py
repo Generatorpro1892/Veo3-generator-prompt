@@ -1,63 +1,52 @@
 import streamlit as st
-import json
+import google.generativeai as genai
+from PIL import Image
+import io
 
-# --- Dummy function contoh analisis ---
-# Ganti ini dengan fungsi AI / Gemini kamu
-def analyze_image(file):
-    # Misalnya hasil AI return JSON string
-    return """
-    {
-      "subject": "Wanita cantik",
-      "action": "Memegang dan memamerkan produk",
-      "expression": "Senyum percaya diri",
-      "location": "Ruangan bergaya minimalis",
-      "story": "Temukan kenyamanan dan gaya modern dalam setiap momen"
-    }
+# Load API Key dari secrets
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+# Fungsi analisis gambar + buat prompt profesional
+def generate_promo_prompt(image, product_type="produk"):
+    model = genai.GenerativeModel("gemini-1.5-flash")
+
+    prompt = f"""
+    Kamu adalah AI kreatif yang ahli membuat skrip video promosi profesional untuk iklan produk.
+    Analisis gambar berikut (fokus pada produk utama), lalu buat prompt lengkap untuk Gemini Veo 3
+    agar menghasilkan video promosi berdurasi ±12 detik.
+
+    Format wajib:
+    1. **Character**: deskripsi subjek utama (usia, gaya, penampilan, outfit).
+    2. **Background**: suasana lokasi, pencahayaan, detail ruangan/latar.
+    3. **Action**: alur adegan per detik (0-3s, 3-6s, dst) dengan gerakan kamera.
+    4. **Dialogue**: kalimat yang diucapkan model (bahasa Indonesia).
+    5. **Voice-over**: narasi promosi profesional (energik, jelas).
+    6. **Camera Style**: gaya pengambilan gambar (close-up, zoom, panning).
+    7. **Lighting**: pencahayaan (natural, cinematic, spotlight, dll).
+    8. **Music**: jenis musik pengiring.
+    9. **Aspect Ratio**: 9:16 (vertical, cocok untuk TikTok/Reels).
+    10. **Language**: Indonesia & English (dua versi).
+
+    Pastikan hasilnya panjang, detail, profesional, dan persuasif.
+    Fokus: promosi {product_type}.
     """
 
-st.set_page_config(page_title="Image to Prompt", layout="centered")
+    response = model.generate_content([prompt, image])
+    return response.text
 
-st.title("🖼️ Image to Prompt Generator")
+# UI Streamlit
+st.title("📽️ AI Video Promo Prompt Generator (Veo 3)")
 
-# Upload file
-uploaded_file = st.file_uploader("Upload gambar", type=["jpg", "jpeg", "png"])
-
-# Data default (kosong)
-data = {"subject": "", "action": "", "expression": "", "location": "", "story": ""}
+uploaded_file = st.file_uploader("Upload gambar produk (jpg/png)", type=["jpg","jpeg","png"])
 
 if uploaded_file:
-    with st.spinner("⏳ Menganalisis gambar..."):
-        try:
-            analysis = analyze_image(uploaded_file)
-            st.write("📊 **Hasil Analisis Mentah:**")
-            st.code(analysis, language="json")
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Gambar produk yang dianalisis", use_column_width=True)
 
-            # --- Coba parse JSON ---
-            try:
-                data = json.loads(analysis)
-            except:
-                st.warning("⚠️ Hasil analisis bukan JSON valid, silakan isi manual.")
+    product_type = st.text_input("Jenis produk (contoh: sepatu, baju gamis, sandal)", "produk")
 
-        except Exception as e:
-            st.error(f"Analisis gagal: {e}")
-
-# --- Form detail prompt ---
-st.subheader("✏️ Detail Prompt")
-
-subject = st.text_input("Subjek Utama", value=data.get("subject", ""))
-action = st.text_input("Aksi atau Aktivitas", value=data.get("action", ""))
-expression = st.text_input("Ekspresi Wajah", value=data.get("expression", ""))
-location = st.text_input("Lokasi", value=data.get("location", ""))
-story = st.text_area("Cerita / Storytelling", value=data.get("story", ""))
-
-# --- Gabung prompt final ---
-if st.button("🔮 Generate Prompt Final"):
-    final_prompt = f"""
-    Subjek: {subject}
-    Aksi: {action}
-    Ekspresi: {expression}
-    Lokasi: {location}
-    Story: {story}
-    """
-    st.success("✅ Prompt Final Berhasil Dibuat!")
-    st.code(final_prompt.strip(), language="markdown")
+    if st.button("🔮 Buat Prompt Profesional"):
+        with st.spinner("Sedang menganalisis gambar & membuat prompt..."):
+            prompt_output = generate_promo_prompt(image, product_type)
+        st.subheader("🎬 Prompt Video Promosi")
+        st.markdown(prompt_output)
