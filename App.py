@@ -1,4 +1,4 @@
-       import streamlit as st
+import streamlit as st
 import google.generativeai as genai
 
 # Konfigurasi API Gemini dari Streamlit Secrets
