@@ -2,59 +2,61 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-# --- Konfigurasi API ---
+# Konfigurasi API Key
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# --- Fungsi Analisis Gambar & Generate Prompt ---
-def generate_promo_prompt(image, product_type="produk"):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-    prompt = f"""
-    Kamu adalah AI kreatif yang ahli membuat skrip video promosi profesional.
-    Analisis gambar berikut (fokus pada produk utama), lalu buat 2 versi prompt lengkap 
-    untuk Gemini Veo 3 (Bahasa Indonesia & English).
+st.title("🎬 Veo 3 Prompt Generator (Auto + Manual Edit)")
 
-    Durasi video: 8 detik.
-
-    Format setiap prompt (wajib ada semua):
-    1. Character: deskripsi subjek utama (usia, gaya, outfit, ekspresi).
-    2. Background: suasana lokasi, pencahayaan, detail latar.
-    3. Action: alur adegan per detik (0-3s, 3-6s, dst) + gerakan kamera.
-    4. Dialogue: kalimat yang diucapkan karakter (jika ada).
-    5. Voice-over: narasi promosi profesional.
-    6. Camera Style: close-up, zoom, panning, dll.
-    7. Lighting: natural, cinematic, spotlight, dll.
-    8. Music: jenis musik pengiring.
-    9. Aspect Ratio: 9:16 (vertical, cocok TikTok/Reels).
-
-    Buat hasilnya panjang, detail, persuasif, dan profesional.
-    Fokus: promosi {product_type}.
-    """
-
-    response = model.generate_content([prompt, image])
-    return response.text
-
-# --- UI Streamlit ---
-st.set_page_config(page_title="Veo3 Promo Generator", layout="centered")
-st.title("📽️ AI Video Promo Prompt Generator (Veo 3)")
-
-uploaded_file = st.file_uploader("📤 Upload gambar produk (jpg/png)", type=["jpg", "jpeg", "png"])
+uploaded_file = st.file_uploader("Upload gambar produk (jpg/png)", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, caption="📸 Gambar produk yang dianalisis", use_column_width=True)
+    st.image(image, caption="Gambar produk", use_column_width=True)
 
-    product_type = st.text_input("📝 Jenis produk (contoh: sepatu, baju, sandal)", "produk")
+    if st.button("🔍 Analisis Otomatis"):
+        with st.spinner("Sedang menganalisis gambar..."):
+            auto_prompt = model.generate_content([
+                "Analisis gambar ini. Buat deskripsi singkat untuk isi form video promosi: subjek, aksi, ekspresi, tempat, waktu, kamera, pencahayaan, gaya, suasana, musik, dialog, detail tambahan.",
+                image
+            ]).text
 
-    if st.button("🔮 Buat Prompt Profesional"):
-        with st.spinner("⏳ Sedang menganalisis gambar & membuat prompt..."):
-            prompt_output = generate_promo_prompt(image, product_type)
+        st.session_state["auto_prompt"] = auto_prompt
 
-        # --- Tampilkan hasil langsung ---
-        st.subheader("🇮🇩 Prompt Bahasa Indonesia")
-        st.text_area("Prompt Indonesia", prompt_output, height=300, key="indo")
+# Isi form (auto terisi kalau sudah dianalisis)
+subjek = st.text_input("1. Subjek", st.session_state.get("auto_prompt", "Seorang model memegang produk"))
+aksi = st.text_input("2. Aksi", "Menunjukkan produk ke kamera")
+ekspresi = st.text_input("3. Ekspresi", "Tersenyum ramah")
+tempat = st.text_input("4. Tempat", "Studio dengan latar bersih minimalis")
+waktu = st.selectbox("5. Waktu", ["Pagi", "Siang", "Sore", "Malam"])
+kamera = st.text_input("6. Gerakan Kamera", "Close-up lalu zoom out")
+pencahayaan = st.text_input("7. Pencahayaan", "Cinematic natural light")
+gaya = st.text_input("8. Gaya Video", "Modern realistis")
+suasana = st.text_input("9. Suasana Video", "Enerjik dan profesional")
+rasio = st.selectbox("10. Aspek Rasio", ["9:16 (Vertikal)", "16:9 (Lanskap)"])
+musik = st.text_input("11. Suara/Musik", "Musik modern energik")
+dialog = st.text_area("12. Kalimat yang Diucapkan", "Segera dapatkan produk terbaru kami sekarang juga!")
+bahasa = st.selectbox("13. Bahasa Percakapan", ["Indonesia", "English"])
+detail = st.text_area("14. Detail Tambahan", "Tambahkan animasi teks promosi di layar")
 
-        st.subheader("🇬🇧 Prompt English")
-        st.text_area("Prompt English", prompt_output, height=300, key="eng")
-
-        st.info("⚡ Salin manual teks di atas (lebih stabil tanpa parsing JSON).")
+if st.button("✨ Buat Prompt Final"):
+    hasil = f"""
+Subjek: {subjek}
+Aksi: {aksi}
+Ekspresi: {ekspresi}
+Tempat: {tempat}
+Waktu: {waktu}
+Gerakan Kamera: {kamera}
+Pencahayaan: {pencahayaan}
+Gaya Video: {gaya}
+Suasana Video: {suasana}
+Aspek Rasio: {rasio}
+Suara/Musik: {musik}
+Kalimat yang Diucapkan: {dialog}
+Bahasa Percakapan: {bahasa}
+Detail Tambahan: {detail}
+    """
+    st.subheader("📋 Prompt Siap Pakai")
+    st.code(hasil, language="markdown")
+    st.button("📋 Salin ke Clipboard", on_click=lambda: st.write("👉 Copy manual di atas (Streamlit mobile belum support auto-copy)."))
