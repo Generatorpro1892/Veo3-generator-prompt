@@ -1,73 +1,66 @@
 import streamlit as st
 import google.generativeai as genai
-import json
 
-# ====== Setup API Key ======
+# --- Konfigurasi API ---
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# ====== Fungsi analisis gambar ======
-def analyze_image(image_path):
+# --- Fungsi analisis gambar ---
+def analyze_image(uploaded_file):
     model = genai.GenerativeModel("gemini-1.5-flash")
     prompt = "Deskripsikan detail orang dalam gambar ini untuk keperluan pembuatan iklan video. Fokus pada ciri fisik, pakaian, suasana."
-    response = model.generate_content([prompt, image_path])
+
+    # baca file jadi bytes (biar tidak error TypeError)
+    image_bytes = uploaded_file.read()
+    image_data = {
+        "mime_type": uploaded_file.type,  # contoh: "image/jpeg"
+        "data": image_bytes
+    }
+
+    response = model.generate_content([prompt, image_data])
     return response.text
 
-# ====== Fungsi generator scene ======
-def generate_scenes(model_desc, product_name, n_scenes=3):
-    base_prompt = f"""
-    Buatkan {n_scenes} skenario video promosi berdurasi 8 detik tiap scene.
-    Model/karakter harus sama dengan deskripsi ini: {model_desc}.
-    Produk yang dipromosikan: {product_name}.
-    
-    Untuk tiap scene sertakan:
-    1. Visual (aksi, lokasi, suasana, angle kamera).
-    2. Narasi/voice-over singkat.
-    3. Durasi = 8 detik.
+# --- Fungsi buat generate 3 scene ---
+def generate_scenes(description):
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    prompt = f"""
+    Berdasarkan deskripsi model berikut: {description}
 
-    Format jawaban dalam JSON:
-    {{
-      "scenes": [
-        {{
-          "scene": 1,
-          "visual": "...",
-          "voiceover": "...",
-          "duration": "8s"
-        }},
-        ...
-      ]
-    }}
+    Buatkan 3 scene promosi video berdurasi total 8 detik.
+    Format harus seperti ini (tanpa tambahan penjelasan lain):
+
+    Scene 1:
+    - Visual: [deskripsi visual detail]
+    - Voice Over: [narasi singkat]
+
+    Scene 2:
+    - Visual: [deskripsi visual detail]
+    - Voice Over: [narasi singkat]
+
+    Scene 3:
+    - Visual: [deskripsi visual detail]
+    - Voice Over: [narasi singkat]
     """
-    model = genai.GenerativeModel("gemini-pro")
-    response = model.generate_content(base_prompt)
 
-    try:
-        return json.loads(response.text)
-    except:
-        return {"error": "JSON parsing gagal", "raw_output": response.text}
+    response = model.generate_content(prompt)
+    return response.text
 
-# ====== Streamlit UI ======
-st.title("🎬 Prompt Generator Otomatis (Gemini API)")
+# --- UI Streamlit ---
+st.title("🎬 Veo 3 Prompt Generator (Auto 3 Scene)")
 
-uploaded_file = st.file_uploader("📷 Upload gambar referensi model", type=["jpg", "png", "jpeg"])
-product_name = st.text_input("👜 Nama produk", "Sepatu Premium")
-n_scenes = st.slider("🎞️ Jumlah scene", 1, 5, 3)
+uploaded_file = st.file_uploader("Upload gambar referensi (jpg/png)", type=["jpg", "jpeg", "png"])
 
-if uploaded_file and st.button("🚀 Generate Prompt"):
-    with st.spinner("Analisis gambar..."):
-        model_desc = analyze_image(uploaded_file)
+if uploaded_file:
+    st.image(uploaded_file, caption="Gambar Referensi", use_container_width=True)
 
-    with st.spinner("Buat skenario..."):
-        scenes = generate_scenes(model_desc, product_name, n_scenes)
+    if st.button("🚀 Generate Prompt"):
+        with st.spinner("Analisis gambar..."):
+            description = analyze_image(uploaded_file)
 
-    st.subheader("📌 Deskripsi Model dari Gambar")
-    st.write(model_desc)
+        st.subheader("🔎 Hasil Analisis")
+        st.write(description)
 
-    st.subheader("📌 Prompt Skenario")
-    st.json(scenes)
+        with st.spinner("Generate 3 scene promosi..."):
+            scenes = generate_scenes(description)
 
-    st.download_button(
-        "💾 Download JSON",
-        data=json.dumps(scenes, indent=2, ensure_ascii=False),
-        file_name="scenes.json",
-        mime="application/json"
-    )
+        st.subheader("🎬 Prompt Final (3 Scene)")
+        st.write(scenes)
