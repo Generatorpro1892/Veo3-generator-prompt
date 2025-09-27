@@ -1,2 +1,7 @@
+torch
+diffusers
+transformers
+accelerate
+safetensors
 streamlit
-google-generativeai
+Pillow
