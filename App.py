@@ -1,66 +1,73 @@
 import streamlit as st
-import google.generativeai as genai
+from diffusers import StableDiffusionXLImg2ImgPipeline
+from PIL import Image
+import torch, random, zipfile, io, os
 
-# --- Konfigurasi API ---
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+st.set_page_config(page_title="AI Promo Generator 👡", layout="wide")
+st.title("👠 AI Promo Image Generator (Format 9:16)")
 
-# --- Fungsi analisis gambar ---
-def analyze_image(uploaded_file):
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = "Deskripsikan detail orang dalam gambar ini untuk keperluan pembuatan iklan video. Fokus pada ciri fisik, pakaian, suasana."
+# Upload produk
+uploaded_file = st.file_uploader("Upload gambar produk (jpg/png)", type=["jpg", "png"])
 
-    # baca file jadi bytes (biar tidak error TypeError)
-    image_bytes = uploaded_file.read()
-    image_data = {
-        "mime_type": uploaded_file.type,  # contoh: "image/jpeg"
-        "data": image_bytes
-    }
+# Jumlah scene
+num_scenes = st.slider("Jumlah pose iklan:", 1, 5, 3)
 
-    response = model.generate_content([prompt, image_data])
-    return response.text
-
-# --- Fungsi buat generate 3 scene ---
-def generate_scenes(description):
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    prompt = f"""
-    Berdasarkan deskripsi model berikut: {description}
-
-    Buatkan 3 scene promosi video berdurasi total 8 detik.
-    Format harus seperti ini (tanpa tambahan penjelasan lain):
-
-    Scene 1:
-    - Visual: [deskripsi visual detail]
-    - Voice Over: [narasi singkat]
-
-    Scene 2:
-    - Visual: [deskripsi visual detail]
-    - Voice Over: [narasi singkat]
-
-    Scene 3:
-    - Visual: [deskripsi visual detail]
-    - Voice Over: [narasi singkat]
-    """
-
-    response = model.generate_content(prompt)
-    return response.text
-
-# --- UI Streamlit ---
-st.title("🎬 Veo 3 Prompt Generator (Auto 3 Scene)")
-
-uploaded_file = st.file_uploader("Upload gambar referensi (jpg/png)", type=["jpg", "jpeg", "png"])
+# Daftar template scene
+all_scenes = [
+    "Wanita muda berjalan di mall, full body shot, memakai sandal dari gambar input, gaya iklan fashion profesional.",
+    "Close-up kaki wanita melangkah, fokus ke sandal dari gambar input, background blur, detail produk tajam.",
+    "Wanita duduk santai di sofa elegan, kaki bersilang, memakai sandal dari gambar input, gaya lifestyle.",
+    "Wanita berpose di studio putih, katalog produk, fokus ke sandal dari gambar input.",
+    "Street fashion style, wanita berjalan di trotoar kota modern, memakai sandal dari gambar input.",
+    "Foto artistic di dalam butik fashion, sandal dari gambar input menjadi fokus utama.",
+    "Wanita berdiri di taman kota, cahaya natural, memakai sandal dari gambar input.",
+    "Close-up kaki wanita di lantai marmer glossy, fokus pada sandal dari gambar input.",
+    "Fashion shoot dengan background pastel, lighting studio, sandal dari gambar input jelas terlihat.",
+    "Outdoor photoshoot di kafe modern, wanita memakai sandal dari gambar input."
+]
 
 if uploaded_file:
-    st.image(uploaded_file, caption="Gambar Referensi", use_container_width=True)
+    product_image = Image.open(uploaded_file).convert("RGB")
 
-    if st.button("🚀 Generate Prompt"):
-        with st.spinner("Analisis gambar..."):
-            description = analyze_image(uploaded_file)
+    # Load model
+    pipe = StableDiffusionXLImg2ImgPipeline.from_pretrained(
+        "stabilityai/stable-diffusion-xl-refiner-1.0",
+        torch_dtype=torch.float16
+    ).to("cuda")
 
-        st.subheader("🔎 Hasil Analisis")
-        st.write(description)
+    # Pilih scene random
+    selected_scenes = random.sample(all_scenes, num_scenes)
 
-        with st.spinner("Generate 3 scene promosi..."):
-            scenes = generate_scenes(description)
+    results = []
+    zip_buffer = io.BytesIO()
 
-        st.subheader("🎬 Prompt Final (3 Scene)")
-        st.write(scenes)
+    with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+        for idx, scene in enumerate(selected_scenes, start=1):
+            with st.spinner(f"🔄 Generate Scene {idx}..."):
+                result = pipe(
+                    prompt=scene,
+                    image=product_image,
+                    strength=0.75,
+                    guidance_scale=7.5,
+                    height=1920,  # tinggi → 9:16
+                    width=1080    # lebar → 9:16
+                )
+                out_img = result.images[0]
+                results.append(out_img)
+
+                # Simpan ke zip
+                img_path = f"scene_{idx}.jpg"
+                out_img.save(img_path)
+                zip_file.write(img_path)
+                os.remove(img_path)
+
+                st.image(out_img, caption=f"Scene {idx}: {scene}", use_container_width=True)
+
+    # Tombol download zip
+    zip_buffer.seek(0)
+    st.download_button(
+        "⬇️ Download Semua Gambar (ZIP)",
+        data=zip_buffer,
+        file_name="promo_images.zip",
+        mime="application/zip"
+    )
